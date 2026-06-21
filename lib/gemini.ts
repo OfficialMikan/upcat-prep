@@ -1,7 +1,11 @@
 import type { Subject, Difficulty } from '@/types'
 
-const MODELS = { flash: 'gemini-2.5-flash', flashLite: 'gemini-2.5-flash-lite-preview-06-17' } as const
-const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
+const MODELS = {
+  flash: 'gemini-2.5-flash',
+  flashLite: 'gemini-2.5-flash-lite' // Update this line
+} as const;
+
+const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 const QUESTION_SCHEMA = {
   type: 'object',
