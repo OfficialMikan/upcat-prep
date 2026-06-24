@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useQuizStore } from '@/store/quizStore'
 import { UPCAT_TOPICS, SUBJECT_LIST } from '@/data/topics'
 import type { Subject, Difficulty, GradingMode } from '@/types'
@@ -73,13 +74,16 @@ export default function HomePage() {
   return (
     <>
       <Header/>
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <main id="main-content" className="max-w-3xl mx-auto px-4 py-8">
         <div className="rounded-2xl p-8 mb-6 text-center border" style={{ background: 'linear-gradient(160deg, #EFF6FF 0%, var(--bg) 60%)', borderColor: 'var(--border)' }}>
           <h1 className="font-serif text-4xl mb-2" style={{ color: 'var(--text)' }}>UPCAT PREP</h1>
-          <p style={{ color: 'var(--text2)' }}>AI-powered questions, real UPG scoring, bilingual support. Built for UP admission.</p>
+          <p style={{ color: 'var(--text)' }}>AI-powered questions, real UPG scoring, bilingual support. Built for UP admission.</p>
           <div className="flex flex-wrap gap-2 justify-center mt-4">
             {SUBJECT_LIST.map(s => { const d = UPCAT_TOPICS[s]; return <span key={s} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: d.bg, color: d.color }}>{d.icon} {d.label}</span> })}
           </div>
+          <Link href="/about" className="inline-flex items-center gap-1.5 mt-5 text-sm font-semibold text-blue-700 dark:text-blue-400 hover:underline rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 px-1">
+            ℹ️ New here? See how it works →
+          </Link>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
@@ -224,7 +228,7 @@ export default function HomePage() {
             {mode === 'mock' ? '🎯 Start Mock Exam (180Q / 3h)' : mode === 'spaced' ? '🔁 Start Spaced Review' : mode === 'custom' ? '📁 Start Custom Quiz' : 'Start Practice Session →'}
           </button>
         </div>
-      </div>
+      </main>
     </>
   )
 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateQuestion, generateBatch } from '@/lib/gemini'
+import { generateQuestion, generateBatch } from '@/lib/ai/content'
+import { resolveAISettings } from '@/lib/ai/settings'
 import { getQuestionFromDB, saveQuestionToDB } from '@/lib/supabase'
+import { MODEL_CATALOGUE } from '@/types/providers'
 import type { Subject, Difficulty } from '@/types'
 
 export async function POST(req: NextRequest) {
@@ -8,12 +10,19 @@ export async function POST(req: NextRequest) {
     const body = await req.json() as {
       subject: Subject; subtopic: string; topic: string; difficulty: Difficulty
       batch?: number; skipCache?: boolean; useLite?: boolean
+      provider?: string; model?: string
     }
-    const { subject, subtopic, topic, difficulty, batch, skipCache, useLite } = body
+    const { subject, subtopic, topic, difficulty, batch, skipCache, useLite, provider, model } = body
     if (!subject || !topic) return NextResponse.json({ error: 'Missing subject or topic' }, { status: 400 })
 
+    const resolved = resolveAISettings({ provider, model })
+    const activeModel = useLite ? resolved.liteModel : resolved.model
+    const activeProvider = useLite ? resolved.liteProvider : resolved.provider
+    const supportsJsonSchema = MODEL_CATALOGUE.find(m => m.id === activeModel)?.supportsJsonSchema ?? true
+    const genOpts = { provider: activeProvider, model: activeModel, supportsJsonSchema }
+
     if (batch && batch > 1) {
-      const questions = await generateBatch(subject, subtopic, topic, difficulty, Math.min(batch, 10), useLite)
+      const questions = await generateBatch(subject, subtopic, topic, difficulty, Math.min(batch, 10), genOpts)
       Promise.all(questions.map(q => saveQuestionToDB(q))).catch(() => {})
       return NextResponse.json({ questions })
     }
@@ -31,9 +40,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const question = await generateQuestion(subject, subtopic, topic, difficulty, useLite)
+    const question = await generateQuestion(subject, subtopic, topic, difficulty, genOpts)
     saveQuestionToDB(question).catch(() => {})
-    return NextResponse.json({ question })
+    return NextResponse.json({ question, _meta: { provider: activeProvider, model: activeModel } })
 
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
@@ -44,6 +53,7 @@ export async function POST(req: NextRequest) {
     }
     if (message === 'SAFETY_BLOCK') return NextResponse.json({ error: 'safety_block', message: 'Content blocked.' }, { status: 422 })
     if (message.startsWith('AUTH_ERROR:')) return NextResponse.json({ error: 'auth', message: 'Invalid API key.' }, { status: 401 })
+    if (message.startsWith('NO_KEY:')) return NextResponse.json({ error: 'no_key', message: message.replace('NO_KEY:', '') }, { status: 401 })
     if (message.startsWith('BAD_REQUEST:')) return NextResponse.json({ error: 'bad_request', message }, { status: 400 })
     console.error('[generate-question]', message)
     return NextResponse.json({ error: 'generation_failed', message }, { status: 500 })

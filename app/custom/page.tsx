@@ -95,7 +95,7 @@ export default function CustomQuestionsPage() {
   return (
     <>
       <Header/>
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <main id="main-content" className="max-w-3xl mx-auto px-4 py-8">
         <h1 className="font-serif text-3xl mb-1" style={{ color: 'var(--text)' }}>📁 My Questions</h1>
         <p className="text-sm mb-6" style={{ color: 'var(--text3)' }}>Upload reviewers, paste content, or drop a PDF. AI extracts and saves UPCAT-style questions.</p>
 
@@ -152,7 +152,7 @@ export default function CustomQuestionsPage() {
             {result.questions && result.questions.length > 3 && <p className="text-xs mt-2 opacity-70">+{result.questions.length - 3} more saved</p>}
           </div>
         )}
-      </div>
+      </main>
     </>
   )
 }

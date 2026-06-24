@@ -73,7 +73,7 @@ export default function DashboardPage() {
   return (
     <>
       <Header/>
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <main id="main-content" className="max-w-4xl mx-auto px-4 py-8">
         <h1 className="font-serif text-3xl mb-1" style={{ color: 'var(--text)' }}>📊 Dashboard</h1>
         <p className="text-sm mb-6" style={{ color: 'var(--text3)' }}>Your progress, weak areas, and performance trends.</p>
 
@@ -205,7 +205,7 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </>
   )
 }

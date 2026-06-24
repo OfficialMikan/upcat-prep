@@ -53,7 +53,7 @@ export default function ResultsPage() {
   return (
     <>
       <Header/>
-      <div className="max-w-3xl mx-auto px-4 py-8 pb-16">
+      <main id="main-content" className="max-w-3xl mx-auto px-4 py-8 pb-16">
         <div className="text-center mb-8">
           <div className="text-5xl mb-3">{emoji}</div>
           <h1 className="font-serif text-3xl mb-2" style={{ color: 'var(--text)' }}>{headline}</h1>
@@ -146,8 +146,8 @@ export default function ResultsPage() {
           <Link href="/dashboard" className="px-6 py-3 rounded-xl border font-semibold text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-800" style={{ borderColor: 'var(--border)', color: 'var(--text)' }}>📊 Dashboard</Link>
           <Link href="/flashcards" className="px-6 py-3 rounded-xl border font-semibold text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-800" style={{ borderColor: 'var(--border)', color: 'var(--text)' }}>🃏 Flashcards</Link>
         </div>
-        {saved && <p className="text-xs mt-3" style={{ color: 'var(--text3)' }}>✓ Session saved to database</p>}
-      </div>
+        {saved && <p className="text-xs mt-3" style={{ color: 'var(--text2)' }}>✓ Session saved to database</p>}
+      </main>
     </>
   )
 }

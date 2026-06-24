@@ -96,7 +96,7 @@ export default function FlashcardsPage() {
   return (
     <>
       <Header/>
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <main id="main-content" className="max-w-2xl mx-auto px-4 py-8">
         <h1 className="font-serif text-3xl mb-1" style={{ color: 'var(--text)' }}>🃏 Flashcard Mode</h1>
         <p className="text-sm mb-6" style={{ color: 'var(--text3)' }}>Quick drills. Tap the card to flip. Rate your confidence to schedule spaced review.</p>
 
@@ -175,7 +175,7 @@ export default function FlashcardsPage() {
             )}
           </div>
         )}
-      </div>
+      </main>
     </>
   )
 }

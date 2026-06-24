@@ -21,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="font-sans antialiased min-h-screen" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+        <a href="#main-content" className="skip-link">Skip to main content</a>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange={false}>
           {children}
         </ThemeProvider>

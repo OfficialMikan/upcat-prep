@@ -4,7 +4,7 @@
   :root {
     --bg: #F4F2ED; --card: #FFFFFF; --card2: #F9F8F5;
     --border: #E3DDD3; --border2: #CAC4B8;
-    --text: #1A1816; --text2: #635D55; --text3: #9C968B;
+    --text: #1A1816; --text2: #635D55; --text3: #6E685E;
     --maroon: #7B1D1D; --maroon-l: #FEF2F2;
     --forest: #166534; --forest-l: #F0FDF4;
     --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -13,7 +13,7 @@
   .dark {
     --bg: #12110E; --card: #1E1C18; --card2: #262420;
     --border: #353028; --border2: #4A4438;
-    --text: #F0EDE8; --text2: #A89E92; --text3: #6A6258;
+    --text: #F0EDE8; --text2: #A89E92; --text3: #9C9486;
   }
   body { font-family: var(--font-sans); }
   .font-serif { font-family: var(--font-serif) !important; }
@@ -25,6 +25,60 @@
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
 .math-block { overflow-x: auto; padding: 8px 0; }
+
+/* ── Accessibility: visible focus indicators everywhere ──
+   Many interactive elements in this app set custom backgrounds/borders
+   inline, which can visually swallow the browser's default focus ring.
+   This establishes one consistent, high-contrast focus style for
+   keyboard users across buttons, links, and form controls, while not
+   showing a ring for mouse/touch interaction (focus-visible only). */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #2563EB;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.dark a:focus-visible,
+.dark button:focus-visible,
+.dark input:focus-visible,
+.dark select:focus-visible,
+.dark textarea:focus-visible,
+.dark [tabindex]:focus-visible {
+  outline-color: #60A5FA;
+}
+
+/* Screen-reader-only utility (for sr-only labels not already covered by Tailwind's class) */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Skip-to-content link: hidden until focused, then jumps above the header */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 1000;
+  background: #1D4ED8;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus {
+  left: 0;
+}
 
 @keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .animate-slide-up { animation: slideUp 0.22s ease forwards; }

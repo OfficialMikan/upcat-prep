@@ -4,10 +4,13 @@ import { useRouter } from 'next/navigation'
 import { MessageCircle, ArrowLeft, ChevronRight, Flag } from 'lucide-react'
 import clsx from 'clsx'
 import { useQuizStore } from '@/store/quizStore'
+import { useAISettingsStore } from '@/store/aiSettingsStore'
+import { useConfirmDialog } from '@/hooks/useConfirmDialog'
 import QuestionCard from '@/components/quiz/QuestionCard'
 import LiveScoreHUD from '@/components/quiz/LiveScoreHUD'
 import Timer from '@/components/quiz/Timer'
 import ChatbotSidebar from '@/components/chat/ChatbotSidebar'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import type { Question, Subject, Answer, QuizConfig } from '@/types'
 import { UPCAT_TOPICS } from '@/data/topics'
 import { upsertTopicStat, upsertSRItem } from '@/lib/supabase'
@@ -32,11 +35,13 @@ function getNextContext(config: QuizConfig, idx: number) {
 export default function PracticePage() {
   const router = useRouter()
   const store = useQuizStore()
+  const { provider, model } = useAISettingsStore()
   const {
-    config, questions, currentIndex, isAnswered, prefetchQueue,
+    config, questions, currentIndex, isAnswered,
     startSession, pushQuestion, pushPrefetched, shiftPrefetch,
     recordAnswer, nextQuestion, setStatus, finishSession, status, errorMessage,
   } = store
+  const confirmDialog = useConfirmDialog()
 
   const [chosenIndex, setChosenIndex] = useState<number | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
@@ -55,7 +60,7 @@ export default function PracticePage() {
     try {
       for (let i = 0; i < count; i++) {
         const ctx = getNextContext(config, useQuizStore.getState().questions.length + useQuizStore.getState().prefetchQueue.length)
-        const res = await fetch('/api/generate-question', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...ctx, difficulty: config.difficulty }) })
+        const res = await fetch('/api/generate-question', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...ctx, difficulty: config.difficulty, provider, model }) })
         if (res.ok) {
           const data = await res.json() as { question: Question }
           if (data.question) pushPrefetched(data.question)
@@ -63,7 +68,7 @@ export default function PracticePage() {
       }
     } catch { /* silent */ }
     prefetchingRef.current = false
-  }, [config.difficulty, config.subjects, config.selectedTopics, pushPrefetched])
+  }, [config.difficulty, config.subjects, config.selectedTopics, pushPrefetched, provider, model])
 
   const loadNextQuestionRef = useRef<(attempt?: number) => Promise<void>>(async () => {})
 
@@ -81,13 +86,13 @@ export default function PracticePage() {
     try {
       const res = await fetch('/api/generate-question', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject: ctx.subject, subtopic: ctx.subtopic, topic: ctx.topic, difficulty: config.difficulty, useLite: retryCount > 1 }),
+        body: JSON.stringify({ subject: ctx.subject, subtopic: ctx.subtopic, topic: ctx.topic, difficulty: config.difficulty, useLite: retryCount > 1, provider, model }),
       })
       if (res.status === 429) {
         const data = await res.json() as { waitSecs?: number }
         const secs = data.waitSecs || 60
         setWaitSecs(secs)
-        setStatus('error', `Rate limit hit. Auto-retrying in ${secs}s. App switched to Flash-Lite.`)
+        setStatus('error', `Rate limit hit. Auto-retrying in ${secs}s. App switched to a faster model.`)
         window.dispatchEvent(new CustomEvent('upcat:model-switch', { detail: { lite: true } }))
         if (waitIntervalRef.current) clearInterval(waitIntervalRef.current)
         let remaining = secs
@@ -107,6 +112,11 @@ export default function PracticePage() {
         else setStatus('error', 'Content blocked by safety filter. Please try a different topic.')
         return
       }
+      if (res.status === 401) {
+        const data = await res.json() as { message?: string }
+        setStatus('error', data.message || 'API key missing or invalid. Please check Setup.')
+        return
+      }
       if (!res.ok) {
         const data = await res.json() as { message?: string }
         throw new Error(data.message || `HTTP ${res.status}`)
@@ -120,10 +130,9 @@ export default function PracticePage() {
     } catch (err) {
       setStatus('error', err instanceof Error ? err.message : 'Unknown error')
     }
-  }, [config.difficulty, retryCount, setStatus, shiftPrefetch, pushQuestion, prefetch])
+  }, [config.difficulty, retryCount, setStatus, shiftPrefetch, pushQuestion, prefetch, provider, model])
 
   useEffect(() => { loadNextQuestionRef.current = loadNextQuestion }, [loadNextQuestion])
-
 
   useEffect(() => {
     if (initRef.current) return
@@ -167,7 +176,16 @@ export default function PracticePage() {
     loadNextQuestion()
   }, [currentIndex, config.qCount, handleFinish, nextQuestion, loadNextQuestion])
 
-  const confirmExit = () => { if (confirm('Exit session? Your current progress will be lost.')) router.push('/') }
+  const confirmExit = async () => {
+    const ok = await confirmDialog.confirm({
+      title: 'Exit session?',
+      message: 'Your current progress in this session will be lost.',
+      confirmLabel: 'Exit session',
+      cancelLabel: 'Keep going',
+      danger: true,
+    })
+    if (ok) router.push('/')
+  }
 
   const progress = config.qCount > 0 ? (currentIndex / config.qCount) * 100 : 0
   const isLastQuestion = currentIndex + 1 >= config.qCount && isAnswered
@@ -178,49 +196,59 @@ export default function PracticePage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="shrink-0 border-b px-4 py-2.5 flex items-center justify-between gap-3" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
           <div className="flex items-center gap-3">
-            <button onClick={confirmExit} className="flex items-center gap-1 text-sm hover:text-red-500 transition-colors" style={{ color: 'var(--text2)' }}>
-              <ArrowLeft size={16}/><span className="hidden sm:block">Exit</span>
+            <button
+              onClick={confirmExit}
+              aria-label="Exit practice session"
+              className="flex items-center gap-1 text-sm hover:text-red-500 transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 px-1 -mx-1"
+              style={{ color: 'var(--text2)' }}
+            >
+              <ArrowLeft size={16} aria-hidden="true"/><span className="hidden sm:block">Exit</span>
             </button>
-            <div className="h-4 w-px" style={{ background: 'var(--border)' }}/>
+            <div className="h-4 w-px" style={{ background: 'var(--border)' }} aria-hidden="true"/>
             {subjectData && <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full" style={{ background: subjectData.bg, color: subjectData.color }}>{subjectData.icon} {currentQ?.subject}</span>}
-            <span className="text-sm font-semibold" style={{ color: 'var(--text2)' }}>{currentIndex + 1} / {config.qCount}</span>
+            <span className="text-sm font-semibold" style={{ color: 'var(--text2)' }}>
+              <span className="sr-only">Question </span>{currentIndex + 1} / {config.qCount}
+            </span>
           </div>
           <LiveScoreHUD qCount={config.qCount}/>
           <div className="flex items-center gap-2">
             <Timer key={timerKey} totalSeconds={config.timerSecs} onExpire={handleTimerExpire} paused={isAnswered}/>
             <button onClick={() => setChatOpen(o => !o)}
-              className={clsx('w-9 h-9 rounded-full flex items-center justify-center border transition-colors', chatOpen ? 'bg-blue-600 border-blue-600 text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800')}
-              style={!chatOpen ? { borderColor: 'var(--border)', color: 'var(--text2)' } : {}} title="AI Tutor">
-              <MessageCircle size={16}/>
+              aria-label={chatOpen ? 'Close AI tutor chat' : 'Open AI tutor chat'}
+              aria-pressed={chatOpen}
+              className={clsx('w-9 h-9 rounded-full flex items-center justify-center border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2', chatOpen ? 'bg-blue-600 border-blue-600 text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800')}
+              style={!chatOpen ? { borderColor: 'var(--border)', color: 'var(--text2)' } : {}}
+            >
+              <MessageCircle size={16} aria-hidden="true"/>
             </button>
           </div>
         </div>
 
-        <div className="h-1 shrink-0" style={{ background: 'var(--border)' }}>
+        <div className="h-1 shrink-0" style={{ background: 'var(--border)' }} role="progressbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100} aria-label="Session progress">
           <div className="h-full bg-blue-600 transition-all duration-500 ease-out" style={{ width: `${progress}%` }}/>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <main id="main-content" className="flex-1 overflow-y-auto">
           <div className="max-w-2xl mx-auto px-4 py-6">
             {status === 'loading' && !currentQ && (
-              <div className="flex flex-col items-center justify-center py-20 gap-4">
-                <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"/>
-                <p className="text-sm" style={{ color: 'var(--text2)' }}>{retryCount > 0 ? 'Using Flash-Lite for faster generation...' : 'Generating question with Gemini AI...'}</p>
-                <p className="text-xs" style={{ color: 'var(--text3)' }}>Next questions are being pre-loaded in the background</p>
+              <div className="flex flex-col items-center justify-center py-20 gap-4" role="status" aria-live="polite">
+                <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" aria-hidden="true"/>
+                <p className="text-sm" style={{ color: 'var(--text)' }}>{retryCount > 0 ? 'Switching to a faster model…' : 'Generating question with AI…'}</p>
+                <p className="text-xs" style={{ color: 'var(--text2)' }}>Next questions are being pre-loaded in the background</p>
               </div>
             )}
 
             {status === 'error' && (
-              <div className="rounded-2xl border p-6 text-center" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-                <div className="text-4xl mb-3">⚠️</div>
+              <div className="rounded-2xl border p-6 text-center" style={{ background: 'var(--card)', borderColor: 'var(--border)' }} role="alert">
+                <div className="text-4xl mb-3" aria-hidden="true">⚠️</div>
                 <p className="font-semibold mb-2" style={{ color: 'var(--text)' }}>Failed to generate question</p>
-                <p className="text-sm mb-4" style={{ color: 'var(--text2)' }}>{errorMessage}</p>
+                <p className="text-sm mb-4" style={{ color: 'var(--text)' }}>{errorMessage}</p>
                 {waitSecs > 0 ? (
-                  <div className="text-sm text-amber-600 dark:text-amber-400">Auto-retrying in {waitSecs}s... (switched to Flash-Lite)</div>
+                  <div className="text-sm text-amber-700 dark:text-amber-400">Auto-retrying in {waitSecs}s… (switched to a faster model)</div>
                 ) : (
                   <div className="flex gap-3 justify-center">
-                    <button onClick={() => loadNextQuestion()} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors">🔄 Retry</button>
-                    <button onClick={() => router.push('/setup')} className="px-4 py-2 rounded-lg border text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" style={{ borderColor: 'var(--border)', color: 'var(--text2)' }}>⚙️ Setup</button>
+                    <button onClick={() => loadNextQuestion()} className="px-4 py-2 rounded-lg bg-blue-700 text-white text-sm font-medium hover:bg-blue-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">🔄 Retry</button>
+                    <button onClick={() => router.push('/setup')} className="px-4 py-2 rounded-lg border text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" style={{ borderColor: 'var(--border)', color: 'var(--text)' }}>⚙️ Setup</button>
                   </div>
                 )}
               </div>
@@ -233,20 +261,31 @@ export default function PracticePage() {
             {isAnswered && currentQ && (
               <div className="flex gap-3 mt-4 flex-wrap">
                 {isLastQuestion ? (
-                  <button onClick={handleFinish} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm transition-colors"><Flag size={16}/> Finish & See Results</button>
+                  <button onClick={handleFinish} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-green-700 hover:bg-green-800 text-white font-semibold text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"><Flag size={16} aria-hidden="true"/> Finish &amp; See Results</button>
                 ) : (
-                  <button onClick={handleNext} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-colors">Next Question <ChevronRight size={16}/></button>
+                  <button onClick={handleNext} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">Next Question <ChevronRight size={16} aria-hidden="true"/></button>
                 )}
                 {!isLastQuestion && currentIndex >= 2 && (
-                  <button onClick={handleFinish} className="px-4 py-3 rounded-xl border text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" style={{ borderColor: 'var(--border)', color: 'var(--text2)' }}>Finish Early</button>
+                  <button onClick={handleFinish} className="px-4 py-3 rounded-xl border text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" style={{ borderColor: 'var(--border)', color: 'var(--text)' }}>Finish Early</button>
                 )}
               </div>
             )}
             <div className="h-16"/>
           </div>
-        </div>
+        </main>
       </div>
       <ChatbotSidebar question={isAnswered ? (currentQ ?? null) : null} isOpen={chatOpen} onClose={() => setChatOpen(false)}/>
+
+      <ConfirmDialog
+        open={confirmDialog.isOpen}
+        title={confirmDialog.options?.title || ''}
+        message={confirmDialog.options?.message || ''}
+        confirmLabel={confirmDialog.options?.confirmLabel}
+        cancelLabel={confirmDialog.options?.cancelLabel}
+        danger={confirmDialog.options?.danger}
+        onConfirm={confirmDialog.handleConfirm}
+        onCancel={confirmDialog.handleCancel}
+      />
     </div>
   )
 }

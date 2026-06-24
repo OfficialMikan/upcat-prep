@@ -30,7 +30,7 @@ export default function ReferencePage() {
   return (
     <>
       <Header/>
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <main id="main-content" className="max-w-3xl mx-auto px-4 py-8">
         <h1 className="font-serif text-3xl mb-1" style={{ color: 'var(--text)' }}>📚 Quick Reference</h1>
         <p className="text-sm mb-6" style={{ color: 'var(--text3)' }}>AI-generated study summaries for each UPCAT subject.</p>
         <div className="flex gap-2 flex-wrap mb-6">
@@ -64,7 +64,7 @@ export default function ReferencePage() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </>
   )
 }
